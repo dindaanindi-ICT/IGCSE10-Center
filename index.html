@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambridge IGCSE Pseudocode Hub</title>
+    <style>
+        :root {
+            --bg-dark: #12121e;
+            --panel-bg: #1e1e2d;
+            --accent: #6c5ce7;
+            --accent-hover: #5a4bcf;
+            --text-light: #f8f9fa;
+            --text-dim: #a0a0b8;
+            --success: #00b894;
+            --code-bg: #0d0d15;
+            --border: #2d2d42;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 1rem 2rem;
+            border-bottom: 2px solid var(--accent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 { margin: 0; font-size: 1.3rem; color: var(--accent); }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Syntax Reference Sidebar */
+        .docs-panel {
+            width: 300px;
+            background-color: var(--panel-bg);
+            padding: 1rem;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+        }
+
+        .doc-section {
+            margin-bottom: 1rem;
+            background: var(--code-bg);
+            padding: 0.8rem;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .doc-section h3 { margin-top: 0; color: var(--success); font-size: 0.95rem; }
+        .doc-section code { background: #222235; padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; color: #fd79a8; }
+
+        /* Main Workspace */
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            gap: 1rem;
+            overflow-y: auto;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select, button, input {
+            padding: 8px 14px;
+            background: var(--accent);
+            color: white;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        select, input[type="text"], input[type="email"] {
+            background: var(--panel-bg);
+            color: white;
+            cursor: text;
+        }
+
+        .editor-container {
+            display: flex;
+            flex: 1;
+            gap: 1rem;
+            min-height: 350px;
+        }
+
+        textarea {
+            flex: 1;
+            background-color: var(--code-bg);
+            color: #55efc4;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            resize: none;
+            line-height: 1.5;
+        }
+
+        .output-panel {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .console, .inspector {
+            flex: 1;
+            background-color: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+
+        .console h3, .inspector h3 { margin-top: 0; font-size: 0.85rem; color: var(--text-dim); }
+        .log-entry { margin: 4px 0; color: var(--success); }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); font-size: 12px; }
+        th { color: var(--accent); }
+
+        /* Weekly Challenge Section */
+        .challenge-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .challenge-card h2 { margin-top: 0; color: #ffeaa7; font-size: 1.1rem; }
+        .form-group { display: flex; gap: 10px; margin-top: 10px; }
+        .form-group input { flex: 1; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>IGCSE Pseudocode Portal</h1>
+    <span>Grade 9 & 10 Learning Platform</span>
+</header>
+
+<div class="container">
+    <!-- 1. SYNTAX DOCUMENTATION LIBRARY -->
+    <div class="docs-panel">
+        <h2>Syntax Reference</h2>
+        
+        <div class="doc-section">
+            <h3>Selection</h3>
+            <p><code>IF ... THEN ... ELSE ... ENDIF</code></p>
+            <small>Supports comparison logic.</small>
+        </div>
+
+        <div class="doc-section">
+            <h3>Loops</h3>
+            <p><code>FOR i ← 1 TO 5 ... NEXT i</code></p>
+            <p><code>WHILE cond DO ... ENDWHILE</code></p>
+            <p><code>REPEAT ... UNTIL cond</code></p>
+        </div>
+
+        <div class="doc-section">
+            <h3>Array Handling</h3>
+            <p><code>DECLARE arr : ARRAY[1:5] OF STRING</code></p>
+            <small>Cambridge uses 1-based indexing.</small>
+        </div>
+
+        <div class="doc-section">
+            <h3>String Handling</h3>
+            <p><code>LENGTH(str)</code> - Returns string length</p>
+            <p><code>UCASE(str)</code> / <code>LCASE(str)</code></p>
+        </div>
+
+        <div class="doc-section">
+            <h3>File Handling</h3>
+            <p><code>OPENFILE "f.txt" FOR READ/WRITE</code></p>
+            <p><code>READFILE "f.txt", var</code></p>
+            <p><code>CLOSEFILE "f.txt"</code></p>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="workspace">
+        
+        <!-- 2. LIVE SIMULATION SECTION -->
+        <div class="toolbar">
+            <label for="templateSelect">Explore Concept Demo:</label>
+            <select id="templateSelect" onchange="loadTemplate()">
+                <option value="selection">Selection (If-Else)</option>
+                <option value="loops">Loops (For Loop)</option>
+                <option value="arrays">Arrays & Loops</option>
+                <option value="strings">String Manipulation</option>
+                <option value="files">File Handling Concept</option>
+            </select>
+            <button onclick="runSimulation()">▶ Run Code</button>
+            <button onclick="clearConsole()" style="background:#555;">Clear Console</button>
+        </div>
+
+        <div class="editor-container">
+            <textarea id="codeEditor" spellcheck="false"></textarea>
+            
+            <div class="output-panel">
+                <div class="console" id="consoleBox">
+                    <h3>TERMINAL OUTPUT</h3>
+                    <div id="logs"></div>
+                </div>
+                <div class="inspector">
+                    <h3>VARIABLE INSPECTOR</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Variable</th><th>Value</th></tr>
+                        </thead>
+                        <tbody id="variableTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. WEEKLY CHALLENGE & EMAIL SUBMISSION -->
+        <div class="challenge-card">
+            <h2>🏆 Weekly Challenge: Grade 10 Array Search</h2>
+            <p id="challengeDescription">
+                <strong>Task:</strong> Write pseudocode to declare an array of 5 numbers: <code>[12, 45, 68, 23, 89]</code>. 
+                Use a <code>FOR</code> loop to scan through the array and output any number that is greater than 30.
+            </p>
+            
+            <!-- Replace FORMSPREE URL with your own endpoint -->
+            <form id="submissionForm" action="https://formspree.io/f/xyegqgnz" method="POST">
+                <!-- Hidden inputs to send code and challenge title -->
+                <input type="hidden" name="Challenge_Title" value="Weekly Challenge - Array Search">
+                <input type="hidden" name="Submitted_Pseudocode" id="hiddenCodeInput">
+
+                <div class="form-group">
+                    <input type="text" name="Student_Name" placeholder="Your Full Name" required>
+                    <input type="email" name="Student_Email" placeholder="Your Email Address" required>
+                    <button type="submit" onclick="syncCodeSubmission()" style="background: var(--success);">✉️ Submit Code to Teacher</button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// Code Templates for Live Demos
+const templates = {
+    selection: `DECLARE score : INTEGER\nscore ← 85\n\nIF score >= 80 THEN\n    OUTPUT "Grade: Distinction"\nELSE\n    OUTPUT "Grade: Pass"\nENDIF`,
+    loops: `DECLARE total : INTEGER\nDECLARE i : INTEGER\ntotal ← 0\n\nFOR i ← 1 TO 5\n    total ← total + i\n    OUTPUT "Sum at step ", i, " is: ", total\nNEXT i`,
+    arrays: `DECLARE names : ARRAY[1:3] OF STRING\nnames[1] ← "Alice"\nnames[2] ← "Bob"\nnames[3] ← "Charlie"\n\nFOR i ← 1 TO 3\n    OUTPUT "Student ", i, " is ", names[i]\nNEXT i`,
+    strings: `DECLARE msg : STRING\nmsg ← "Cambridge Pseudocode"\n\nOUTPUT "Original: ", msg\nOUTPUT "Length: ", LENGTH(msg)\nOUTPUT "Upper Case: ", UCASE(msg)`,
+    files: `// File Operations Concept\nOPENFILE "results.txt" FOR WRITE\nWRITEFILE "results.txt", "Pass"\nCLOSEFILE "results.txt"\n\nOUTPUT "File saved successfully."`
+};
+
+function loadTemplate() {
+    const key = document.getElementById('templateSelect').value;
+    document.getElementById('codeEditor').value = templates[key];
+}
+
+function logOutput(msg) {
+    const logsDiv = document.getElementById('logs');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.textContent = msg;
+    logsDiv.appendChild(entry);
+}
+
+function clearConsole() {
+    document.getElementById('logs').innerHTML = '';
+}
+
+// Pseudocode Execution Simulator
+function runSimulation() {
+    clearConsole();
+    const rawCode = document.getElementById('codeEditor').value;
+    const lines = rawCode.split('\n');
+    let variables = {};
+    const tableBody = document.getElementById('variableTable');
+    tableBody.innerHTML = '';
+
+    try {
+        lines.forEach((line) => {
+            let trimmed = line.trim();
+            if (trimmed.startsWith('//') || trimmed === '') return;
+
+            if (trimmed.startsWith('DECLARE')) {
+                let parts = trimmed.replace('DECLARE', '').split(':');
+                let varName = parts[0].trim();
+                variables[varName] = 'UNINITIALIZED';
+            }
+            else if (trimmed.includes('←') || trimmed.includes('<-')) {
+                let parts = trimmed.split(/←|<-/);
+                let varName = parts[0].trim();
+                let expr = parts[1].trim();
+
+                expr = expr.replace(/LENGTH\((.*?)\)/g, (m, p1) => (variables[p1] || p1).replace(/"/g, '').length);
+                expr = expr.replace(/UCASE\((.*?)\)/g, (m, p1) => (variables[p1] || p1).replace(/"/g, '').toUpperCase());
+
+                try {
+                    let val = Function('"use strict"; return (' + expr + ')')();
+                    variables[varName] = val;
+                } catch (e) {
+                    variables[varName] = expr.replace(/"/g, '');
+                }
+            }
+            else if (trimmed.startsWith('OUTPUT')) {
+                let content = trimmed.replace('OUTPUT', '').trim();
+                let elements = content.split(',').map(e => {
+                    let clean = e.trim();
+                    if (clean.startsWith('"') && clean.endsWith('"')) return clean.slice(1, -1);
+                    return variables[clean] !== undefined ? variables[clean] : clean;
+                });
+                logOutput(" > " + elements.join(' '));
+            }
+        });
+
+        for (let [key, value] of Object.entries(variables)) {
+            tableBody.innerHTML += `<tr><td>${key}</td><td>${value}</td></tr>`;
+        }
+    } catch (err) {
+        logOutput("Execution Error: " + err.message);
+    }
+}
+
+// Copy editor text into the hidden form field prior to submission
+function syncCodeSubmission() {
+    document.getElementById('hiddenCodeInput').value = document.getElementById('codeEditor').value;
+}
+
+window.onload = loadTemplate;
+</script>
+</body>
+</html>
