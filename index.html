@@ -278,7 +278,6 @@
 
     </div>
 </div>
-
 <script>
 // Code Templates for Live Demos
 const templates = {
@@ -316,73 +315,115 @@ function updateInspector(variables) {
     }
 }
 
-// Full Interpreter with IF/ELSE Block Branching
+// Full Interpreter with Loop Pointer & IF Branching Support
 function runSimulation() {
     clearConsole();
     const rawCode = document.getElementById('codeEditor').value;
     const lines = rawCode.split('\n');
     let variables = {};
     
-    // Control stack to manage execution in active vs inactive IF/ELSE branches
+    // Stack management for IF/ELSE and FOR loops
     let executingStack = [true];
+    let loopStack = []; 
 
     try {
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (line.startsWith('//') || line === '') continue;
+        let pc = 0; // Program Counter (Line Pointer)
+        let maxIterations = 1000; // Guard against infinite loops
+        let count = 0;
 
-            // 1. IF Evaluation
+        while (pc < lines.length && count < maxIterations) {
+            count++;
+            let line = lines[pc].trim();
+
+            if (line.startsWith('//') || line === '') {
+                pc++;
+                continue;
+            }
+
+            // 1. FOR LOOP START
+            if (line.startsWith('FOR')) {
+                let match = line.match(/FOR\s+(\w+)\s*←\s*(.*?)\s+TO\s+(.*)/i);
+                if (match) {
+                    let varName = match[1];
+                    let startVal = Number(evalExpr(match[2], variables));
+                    let endVal = Number(evalExpr(match[3], variables));
+
+                    // Initialize iterator on first hit
+                    if (loopStack.length === 0 || loopStack[loopStack.length - 1].varName !== varName) {
+                        variables[varName] = startVal;
+                        loopStack.push({ varName, endVal, lineIndex: pc });
+                    }
+                }
+                pc++;
+                continue;
+            }
+
+            // 2. NEXT / LOOP END
+            if (line.startsWith('NEXT')) {
+                if (loopStack.length > 0) {
+                    let topLoop = loopStack[loopStack.length - 1];
+                    variables[topLoop.varName] += 1;
+
+                    if (variables[topLoop.varName] <= topLoop.endVal) {
+                        pc = topLoop.lineIndex + 1; // Jump back to body of FOR loop
+                        continue;
+                    } else {
+                        loopStack.pop(); // Loop finished
+                    }
+                }
+                pc++;
+                continue;
+            }
+
+            // 3. IF EVALUATION
             if (line.startsWith('IF')) {
                 let parentActive = executingStack[executingStack.length - 1];
                 if (!parentActive) {
                     executingStack.push(false);
+                    pc++;
                     continue;
                 }
 
                 let condition = line.replace(/^IF/, '').replace(/THEN$/, '').trim();
-                
-                // Inject current variable values into condition string
-                Object.keys(variables).forEach(v => {
-                    if (variables[v] !== 'UNINITIALIZED') {
-                        let reg = new RegExp(`\\b${v}\\b`, 'g');
-                        let val = typeof variables[v] === 'string' ? `"${variables[v]}"` : variables[v];
-                        condition = condition.replace(reg, val);
-                    }
-                });
+                let condEvaluated = evalExpr(condition, variables);
 
                 let result = false;
                 try {
-                    result = Boolean(Function('"use strict"; return (' + condition + ')')());
+                    result = Boolean(Function('"use strict"; return (' + condEvaluated + ')')());
                 } catch(e) {
                     result = false;
                 }
 
                 executingStack.push(result);
+                pc++;
                 continue;
             }
 
-            // 2. ELSE Switch
             if (line === 'ELSE') {
                 if (executingStack.length > 1) {
                     let parentActive = executingStack[executingStack.length - 2];
-                    let previousBranchResult = executingStack.pop();
-                    executingStack.push(parentActive && !previousBranchResult);
+                    let previousBranch = executingStack.pop();
+                    executingStack.push(parentActive && !previousBranch);
                 }
+                pc++;
                 continue;
             }
 
-            // 3. ENDIF Close
             if (line === 'ENDIF') {
                 if (executingStack.length > 1) {
                     executingStack.pop();
                 }
+                pc++;
                 continue;
             }
 
-            // Skip line execution if currently in an inactive branch (e.g. ELSE block when IF is true)
-            if (!executingStack[executingStack.length - 1]) continue;
+            // Skip execution if inside inactive IF/ELSE branch
+            if (!executingStack[executingStack.length - 1]) {
+                pc++;
+                continue;
+            }
 
-            // --- EXECUTABLE STATEMENTS ---
+            // --- STANDARD STATEMENTS ---
 
             // DECLARE
             if (line.startsWith('DECLARE')) {
@@ -417,30 +458,7 @@ function runSimulation() {
                 let parts = line.split(/←|<-/);
                 let varName = parts[0].trim();
                 let expr = parts[1].trim();
-
-                expr = expr.replace(/LENGTH\((.*?)\)/g, (m, p1) => {
-                    let val = variables[p1.trim()] !== undefined ? variables[p1.trim()] : p1.trim();
-                    return String(val).replace(/"/g, '').length;
-                });
-                expr = expr.replace(/UCASE\((.*?)\)/g, (m, p1) => {
-                    let val = variables[p1.trim()] !== undefined ? variables[p1.trim()] : p1.trim();
-                    return `"${String(val).replace(/"/g, '').toUpperCase()}"`;
-                });
-
-                Object.keys(variables).forEach(v => {
-                    if (variables[v] !== 'UNINITIALIZED') {
-                        let reg = new RegExp(`\\b${v}\\b`, 'g');
-                        let val = typeof variables[v] === 'string' ? `"${variables[v]}"` : variables[v];
-                        expr = expr.replace(reg, val);
-                    }
-                });
-
-                try {
-                    let val = Function('"use strict"; return (' + expr + ')')();
-                    variables[varName] = val;
-                } catch (e) {
-                    variables[varName] = expr.replace(/"/g, '');
-                }
+                variables[varName] = evalExpr(expr, variables);
             }
 
             // OUTPUT
@@ -456,11 +474,35 @@ function runSimulation() {
                 
                 logOutput(" > " + elements.join(' '));
             }
+
+            pc++;
         }
 
         updateInspector(variables);
     } catch (err) {
         logOutput("Execution Error: " + err.message);
+    }
+}
+
+// Helper to safely evaluate mathematical and logical expressions with stored variables
+function evalExpr(expr, variables) {
+    let substituted = expr;
+    
+    // Sort variable names by length descending to replace long names before substring names
+    let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
+
+    sortedVars.forEach(v => {
+        if (variables[v] !== 'UNINITIALIZED') {
+            let reg = new RegExp(`\\b${v}\\b`, 'g');
+            let val = typeof variables[v] === 'string' ? `"${variables[v]}"` : variables[v];
+            substituted = substituted.replace(reg, val);
+        }
+    });
+
+    try {
+        return Function('"use strict"; return (' + substituted + ')')();
+    } catch (e) {
+        return expr.replace(/"/g, '');
     }
 }
 
