@@ -311,7 +311,18 @@ function updateInspector(variables) {
     const tableBody = document.getElementById('variableTable');
     tableBody.innerHTML = '';
     for (let [key, value] of Object.entries(variables)) {
-        let displayVal = typeof value === 'object' ? JSON.stringify(value) : value;
+        let displayVal;
+        
+        if (Array.isArray(value)) {
+            // Remove the leading null/empty 0-index position for display
+            let cleanArray = value.filter(item => item !== null && item !== undefined);
+            displayVal = JSON.stringify(cleanArray);
+        } else if (typeof value === 'object') {
+            displayVal = JSON.stringify(value);
+        } else {
+            displayVal = value;
+        }
+
         tableBody.innerHTML += `<tr><td>${key}</td><td>${displayVal}</td></tr>`;
     }
 }
