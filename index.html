@@ -316,7 +316,7 @@ function updateInspector(variables) {
     }
 }
 
-// Complete Cambridge Interpreter (FOR, WHILE, REPEAT, IF/ELSE, INPUT/OUTPUT)
+// Complete Cambridge Interpreter (FOR, WHILE, REPEAT, IF/ELSE, INPUT/OUTPUT, ARRAYS)
 function runSimulation() {
     clearConsole();
     const rawCode = document.getElementById('codeEditor').value;
@@ -484,39 +484,58 @@ function runSimulation() {
                 let content = line.replace('DECLARE', '').trim();
                 let parts = content.split(':');
                 let varNames = parts[0].split(',').map(v => v.trim());
-                
+                let type = parts[1] ? parts[1].trim() : '';
+
                 varNames.forEach(varName => {
-                    variables[varName] = 'UNINITIALIZED';
+                    if (type.toUpperCase().includes('ARRAY')) {
+                        variables[varName] = []; 
+                    } else {
+                        variables[varName] = 'UNINITIALIZED';
+                    }
                 });
             }
             
             // INPUT
             else if (line.startsWith('INPUT')) {
-                let varName = line.replace('INPUT', '').trim();
-                let userInput = prompt(`[INPUT REQUIRED]\nEnter value for variable '${varName}':`);
+                let varExpr = line.replace('INPUT', '').trim();
+                let userInput = prompt(`[INPUT REQUIRED]\nEnter value for '${varExpr}':`);
                 
                 if (userInput !== null) {
-                    if (!isNaN(userInput) && userInput.trim() !== '') {
-                        variables[varName] = Number(userInput);
-                    } else if (userInput.toUpperCase() === 'TRUE') {
-                        variables[varName] = true;
-                    } else if (userInput.toUpperCase() === 'FALSE') {
-                        variables[varName] = false;
-                    } else {
-                        variables[varName] = userInput;
+                    let val = (!isNaN(userInput) && userInput.trim() !== '') ? Number(userInput) : userInput;
+                    if (typeof userInput === 'string') {
+                        if (userInput.toUpperCase() === 'TRUE') val = true;
+                        if (userInput.toUpperCase() === 'FALSE') val = false;
                     }
-                    logOutput(` > INPUT ${varName} = ${variables[varName]}`);
-                } else {
-                    variables[varName] = 'CANCELLED';
+                    
+                    let arrayMatch = varExpr.match(/(\w+)\[(.*?)\]/);
+                    if (arrayMatch) {
+                        let arrName = arrayMatch[1];
+                        let index = Number(evalExpr(arrayMatch[2], variables));
+                        if (!Array.isArray(variables[arrName])) variables[arrName] = [];
+                        variables[arrName][index] = val;
+                    } else {
+                        variables[varExpr] = val;
+                    }
+                    logOutput(` > INPUT ${varExpr} = ${val}`);
                 }
             }
 
             // ASSIGNMENT (← or <-)
             else if (line.includes('←') || line.includes('<-')) {
                 let parts = line.split(/←|<-/);
-                let varName = parts[0].trim();
+                let target = parts[0].trim();
                 let expr = parts[1].trim();
-                variables[varName] = evalExpr(expr, variables);
+                let val = evalExpr(expr, variables);
+
+                let arrayMatch = target.match(/(\w+)\[(.*?)\]/);
+                if (arrayMatch) {
+                    let arrName = arrayMatch[1];
+                    let index = Number(evalExpr(arrayMatch[2], variables));
+                    if (!Array.isArray(variables[arrName])) variables[arrName] = [];
+                    variables[arrName][index] = val;
+                } else {
+                    variables[target] = val;
+                }
             }
 
             // OUTPUT
@@ -527,7 +546,7 @@ function runSimulation() {
                     if (clean.startsWith('"') && clean.endsWith('"')) {
                         return clean.slice(1, -1);
                     }
-                    return variables[clean] !== undefined ? variables[clean] : clean;
+                    return evalExpr(clean, variables);
                 });
                 
                 logOutput(" > " + elements.join(' '));
@@ -542,9 +561,33 @@ function runSimulation() {
     }
 }
 
-// Safely evaluate expressions containing AND, OR, TRUE, FALSE, and stored variables
+// Safely evaluate expressions containing AND, OR, TRUE, FALSE, functions, and arrays
 function evalExpr(expr, variables) {
     let substituted = expr;
+
+    // Handle string utility functions
+    substituted = substituted.replace(/LENGTH\((.*?)\)/gi, (m, arg) => {
+        let val = evalExpr(arg, variables);
+        return String(val).length;
+    });
+    substituted = substituted.replace(/UCASE\((.*?)\)/gi, (m, arg) => {
+        let val = evalExpr(arg, variables);
+        return `"${String(val).toUpperCase()}"`;
+    });
+    substituted = substituted.replace(/LCASE\((.*?)\)/gi, (m, arg) => {
+        let val = evalExpr(arg, variables);
+        return `"${String(val).toLowerCase()}"`;
+    });
+
+    // Handle array accesses like arr[i]
+    substituted = substituted.replace(/(\w+)\[(.*?)\]/g, (match, arrName, idxExpr) => {
+        let idx = Number(evalExpr(idxExpr, variables));
+        if (Array.isArray(variables[arrName]) && variables[arrName][idx] !== undefined) {
+            let item = variables[arrName][idx];
+            return typeof item === 'string' ? `"${item}"` : item;
+        }
+        return 'undefined';
+    });
 
     // Replace Cambridge operators with JS operators
     substituted = substituted
@@ -559,15 +602,14 @@ function evalExpr(expr, variables) {
         .replace(/<===/g, '<=')
         .replace(/>===/g, '>=');
 
-    // Sort variable names by length descending so long names are replaced before short substrings
+    // Sort variable names by length descending
     let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
 
     sortedVars.forEach(v => {
-        if (variables[v] !== 'UNINITIALIZED') {
+        if (variables[v] !== 'UNINITIALIZED' && !Array.isArray(variables[v])) {
             let reg = new RegExp(`\\b${v}\\b`, 'g');
             let val = variables[v];
             
-            // Wrap non-number/non-boolean values in quotes
             if (typeof val === 'string' && val !== 'true' && val !== 'false') {
                 val = `"${val}"`;
             }
@@ -578,9 +620,10 @@ function evalExpr(expr, variables) {
     try {
         return Function('"use strict"; return (' + substituted + ')')();
     } catch (e) {
-        return false;
+        return expr;
     }
 }
+
 // Auto replace <- and Tab handlers
 const editor = document.getElementById('codeEditor');
 
