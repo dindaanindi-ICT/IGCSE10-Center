@@ -13,6 +13,7 @@
             --text-light: #f8f9fa;
             --text-dim: #a0a0b8;
             --success: #00b894;
+            --error: #ff7675;
             --code-bg: #f7fdaf;
             --border: #2d2d42;
         }
@@ -103,17 +104,45 @@
             min-height: 350px;
         }
 
+        /* Line Numbers + Textarea Wrapper */
+        .editor-wrapper {
+            flex: 1;
+            display: flex;
+            background-color: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .line-numbers {
+            width: 40px;
+            background-color: #e5eb8b;
+            color: #7a7e3d;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 1rem 5px 1rem 0;
+            text-align: right;
+            user-select: none;
+            overflow: hidden;
+            box-sizing: border-box;
+            border-right: 1px solid #d4da7b;
+        }
+
         textarea {
             flex: 1;
-            background-color: var(--code-bg);
+            background-color: transparent;
             color: #01383b;
             font-family: 'Consolas', 'Courier New', monospace;
             font-size: 14px;
             padding: 1rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
+            border: none;
+            outline: none;
             resize: none;
             line-height: 1.5;
+            white-space: pre;
+            overflow-x: auto;
+            box-sizing: border-box;
         }
 
         .output-panel {
@@ -137,6 +166,7 @@
         }
         .console h3, .inspector h3 { margin-top: 0; font-size: 0.85rem; color: var(--text-dim); }
         .log-entry { margin: 4px 0; color: var(--success); }
+        .error-entry { margin: 4px 0; color: var(--error); font-weight: bold; }
 
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); font-size: 12px; }
@@ -175,7 +205,6 @@
 </header>
 
 <div class="container">
-    <!-- 1. SYNTAX DOCUMENTATION LIBRARY -->
     <div class="docs-panel">
         <h2 class="ref">Syntax Reference</h2>
         
@@ -205,465 +234,4 @@
 
         <div class="doc-section">
             <h3>String Handling</h3>
-            <p><code>LENGTH(str)</code> - Returns string length</p>
-            <p><code>UCASE(str)</code> / <code>LCASE(str)</code></p>
-        </div>
-
-        <div class="doc-section">
-            <h3>File Handling</h3>
-            <p><code>OPENFILE "f.txt" FOR READ/WRITE</code></p>
-            <p><code>READFILE "f.txt", var</code></p>
-            <p><code>CLOSEFILE "f.txt"</code></p>
-        </div>
-    </div>
-
-    <!-- MAIN WORKSPACE -->
-    <div class="workspace">
-        
-        <!-- 2. LIVE SIMULATION SECTION -->
-        <div class="toolbar">
-            <label for="templateSelect">Explore Concept Demo:</label>
-            <select id="templateSelect" onchange="loadTemplate()">
-                <option value="selection">Selection (If-Else)</option>
-                <option value="loops">Loops (For Loop)</option>
-                <option value="arrays">Arrays & Loops</option>
-                <option value="strings">String Manipulation</option>
-                <option value="files">File Handling Concept</option>
-            </select>
-            <button onclick="runSimulation()">▶ Run Code</button>
-            <button onclick="clearConsole()" style="background:#555;">Clear Console</button>
-        </div>
-
-        <div class="editor-container">
-            <textarea id="codeEditor" spellcheck="false"></textarea>
-            
-            <div class="output-panel">
-                <div class="console" id="consoleBox">
-                    <h3>TERMINAL OUTPUT</h3>
-                    <div id="logs"></div>
-                </div>
-                <div class="inspector">
-                    <h3>VARIABLE INSPECTOR</h3>
-                    <table>
-                        <thead>
-                            <tr><th>Variable</th><th>Value</th></tr>
-                        </thead>
-                        <tbody id="variableTable" style="color:#000"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- 3. WEEKLY CHALLENGE & EMAIL SUBMISSION -->
-        <div class="challenge-card">
-            <h2>🏆 Weekly Challenge: Grade 10 Array Search</h2>
-            <p class="challengeDescription">
-                <strong>Task:</strong> Write pseudocode to declare an array of 5 numbers: <code>[12, 45, 68, 23, 89]</code>. 
-                Use a <code>FOR</code> loop to scan through the array and output any number that is greater than 30.
-            </p>
-            
-            <!-- Replace FORMSPREE URL with your own endpoint -->
-            <form id="submissionForm" action="https://formspree.io/f/YOUR_FORMSPREE_ENDPOINT_HERE" method="POST">
-                <!-- Hidden inputs to send code and challenge title -->
-                <input type="hidden" name="Challenge_Title" value="Weekly Challenge - Array Search">
-                <input type="hidden" name="Submitted_Pseudocode" id="hiddenCodeInput">
-
-                <div class="form-group">
-                    <input type="text" name="Student_Name" placeholder="Your Full Name" required>
-                    <input type="email" name="Student_Email" placeholder="Your Email Address" required>
-                    <button type="submit" onclick="syncCodeSubmission()" style="background: var(--success);">✉️ Submit Code to Teacher</button>
-                </div>
-            </form>
-        </div>
-
-    </div>
-</div>
-
-<script>
-// Code Templates for Live Demos
-const templates = {
-    selection: `DECLARE score : INTEGER\n\nOUTPUT "enter number: "\nINPUT score\n\nIF score >= 80 THEN\n    OUTPUT "Grade: Distinction"\nELSE\n    OUTPUT "Grade: Pass"\nENDIF`,
-    loops: `DECLARE total : INTEGER\nDECLARE i : INTEGER\ntotal ← 0\n\nFOR i ← 1 TO 5\n    total ← total + i\n    OUTPUT "Sum at step ", i, " is: ", total\nNEXT i`,
-    arrays: `DECLARE names : ARRAY[1:3] OF STRING\nnames[1] ← "Alice"\nnames[2] ← "Bob"\nnames[3] ← "Charlie"\n\nFOR i ← 1 TO 3\n    OUTPUT "Student ", i, " is ", names[i]\nNEXT i`,
-    strings: `DECLARE msg : STRING\nmsg ← "Cambridge Pseudocode"\n\nOUTPUT "Original: ", msg\nOUTPUT "Length: ", LENGTH(msg)\nOUTPUT "Upper Case: ", UCASE(msg)`,
-    files: `// File Operations Concept\nOPENFILE "results.txt" FOR WRITE\nWRITEFILE "results.txt", "Pass"\nCLOSEFILE "results.txt"\n\nOUTPUT "File saved successfully."`
-};
-
-function loadTemplate() {
-    const key = document.getElementById('templateSelect').value;
-    document.getElementById('codeEditor').value = templates[key];
-}
-
-function logOutput(msg) {
-    const logsDiv = document.getElementById('logs');
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    entry.textContent = msg;
-    logsDiv.appendChild(entry);
-    logsDiv.parentElement.scrollTop = logsDiv.parentElement.scrollHeight;
-}
-
-function clearConsole() {
-    document.getElementById('logs').innerHTML = '';
-}
-
-function updateInspector(variables) {
-    const tableBody = document.getElementById('variableTable');
-    tableBody.innerHTML = '';
-    for (let [key, value] of Object.entries(variables)) {
-        let displayVal;
-        
-        if (Array.isArray(value)) {
-            // Remove the leading null/empty 0-index position for display
-            let cleanArray = value.filter(item => item !== null && item !== undefined);
-            displayVal = JSON.stringify(cleanArray);
-        } else if (typeof value === 'object') {
-            displayVal = JSON.stringify(value);
-        } else {
-            displayVal = value;
-        }
-
-        tableBody.innerHTML += `<tr><td>${key}</td><td>${displayVal}</td></tr>`;
-    }
-}
-
-// Complete Cambridge Interpreter (FOR, WHILE, REPEAT, IF/ELSE, INPUT/OUTPUT, ARRAYS)
-function runSimulation() {
-    clearConsole();
-    const rawCode = document.getElementById('codeEditor').value;
-    const lines = rawCode.split('\n');
-    let variables = {};
-    
-    let executingStack = [true];
-    let loopStack = []; // Stack for nested FOR, WHILE, and REPEAT loops
-
-    try {
-        let pc = 0;
-        let maxIterations = 2000;
-        let count = 0;
-
-        while (pc < lines.length && count < maxIterations) {
-            count++;
-            let line = lines[pc].trim();
-
-            if (line.startsWith('//') || line === '') {
-                pc++;
-                continue;
-            }
-
-            // 1. REPEAT LOOP START
-            if (line.startsWith('REPEAT')) {
-                loopStack.push({ type: 'REPEAT', lineIndex: pc });
-                pc++;
-                continue;
-            }
-
-            // 2. UNTIL CONDITION
-            if (line.startsWith('UNTIL')) {
-                let condStr = line.replace(/^UNTIL/, '').trim();
-                let condEvaluated = evalExpr(condStr, variables);
-                let isTrue = Boolean(condEvaluated);
-
-                if (!isTrue && loopStack.length > 0) {
-                    let topLoop = loopStack[loopStack.length - 1];
-                    if (topLoop.type === 'REPEAT') {
-                        pc = topLoop.lineIndex + 1; // Loop back
-                        continue;
-                    }
-                } else if (isTrue && loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'REPEAT') {
-                    loopStack.pop(); // Loop condition met, exit
-                }
-                pc++;
-                continue;
-            }
-
-            // 3. WHILE LOOP START
-            if (line.startsWith('WHILE')) {
-                let condStr = line.replace(/^WHILE/, '').replace(/DO$/, '').trim();
-                let condEvaluated = evalExpr(condStr, variables);
-                let isTrue = Boolean(condEvaluated);
-
-                if (isTrue) {
-                    loopStack.push({ type: 'WHILE', lineIndex: pc, condStr: condStr });
-                } else {
-                    let depth = 1;
-                    while (pc < lines.length && depth > 0) {
-                        pc++;
-                        let subLine = lines[pc] ? lines[pc].trim() : '';
-                        if (subLine.startsWith('WHILE')) depth++;
-                        if (subLine === 'ENDWHILE') depth--;
-                    }
-                }
-                pc++;
-                continue;
-            }
-
-            // 4. ENDWHILE
-            if (line === 'ENDWHILE') {
-                if (loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'WHILE') {
-                    let topLoop = loopStack[loopStack.length - 1];
-                    let condEvaluated = evalExpr(topLoop.condStr, variables);
-                    if (Boolean(condEvaluated)) {
-                        pc = topLoop.lineIndex + 1; // Jump back to WHILE body
-                        continue;
-                    } else {
-                        loopStack.pop();
-                    }
-                }
-                pc++;
-                continue;
-            }
-
-            // 5. FOR LOOP START
-            if (line.startsWith('FOR')) {
-                let match = line.match(/FOR\s+(\w+)\s*←\s*(.*?)\s+TO\s+(.*)/i);
-                if (match) {
-                    let varName = match[1];
-                    let startVal = Number(evalExpr(match[2], variables));
-                    let endVal = Number(evalExpr(match[3], variables));
-
-                    if (loopStack.length === 0 || loopStack[loopStack.length - 1].varName !== varName) {
-                        variables[varName] = startVal;
-                        loopStack.push({ type: 'FOR', varName, endVal, lineIndex: pc });
-                    }
-                }
-                pc++;
-                continue;
-            }
-
-            // 6. NEXT / FOR LOOP END
-            if (line.startsWith('NEXT')) {
-                if (loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'FOR') {
-                    let topLoop = loopStack[loopStack.length - 1];
-                    variables[topLoop.varName] += 1;
-
-                    if (variables[topLoop.varName] <= topLoop.endVal) {
-                        pc = topLoop.lineIndex + 1;
-                        continue;
-                    } else {
-                        loopStack.pop();
-                    }
-                }
-                pc++;
-                continue;
-            }
-
-            // 7. IF EVALUATION
-            if (line.startsWith('IF')) {
-                let parentActive = executingStack[executingStack.length - 1];
-                if (!parentActive) {
-                    executingStack.push(false);
-                    pc++;
-                    continue;
-                }
-
-                let condition = line.replace(/^IF/, '').replace(/THEN$/, '').trim();
-                let result = Boolean(evalExpr(condition, variables));
-
-                executingStack.push(result);
-                pc++;
-                continue;
-            }
-
-            if (line === 'ELSE') {
-                if (executingStack.length > 1) {
-                    let parentActive = executingStack[executingStack.length - 2];
-                    let previousBranch = executingStack.pop();
-                    executingStack.push(parentActive && !previousBranch);
-                }
-                pc++;
-                continue;
-            }
-
-            if (line === 'ENDIF') {
-                if (executingStack.length > 1) {
-                    executingStack.pop();
-                }
-                pc++;
-                continue;
-            }
-
-            if (!executingStack[executingStack.length - 1]) {
-                pc++;
-                continue;
-            }
-
-            // --- EXECUTABLE STATEMENTS ---
-
-            // DECLARE
-            if (line.startsWith('DECLARE')) {
-                let content = line.replace('DECLARE', '').trim();
-                let parts = content.split(':');
-                let varNames = parts[0].split(',').map(v => v.trim());
-                let type = parts[1] ? parts[1].trim() : '';
-
-                varNames.forEach(varName => {
-                    if (type.toUpperCase().includes('ARRAY')) {
-                        variables[varName] = []; 
-                    } else {
-                        variables[varName] = 'UNINITIALIZED';
-                    }
-                });
-            }
-            
-            // INPUT
-            else if (line.startsWith('INPUT')) {
-                let varExpr = line.replace('INPUT', '').trim();
-                let userInput = prompt(`[INPUT REQUIRED]\nEnter value for '${varExpr}':`);
-                
-                if (userInput !== null) {
-                    let val = (!isNaN(userInput) && userInput.trim() !== '') ? Number(userInput) : userInput;
-                    if (typeof userInput === 'string') {
-                        if (userInput.toUpperCase() === 'TRUE') val = true;
-                        if (userInput.toUpperCase() === 'FALSE') val = false;
-                    }
-                    
-                    let arrayMatch = varExpr.match(/(\w+)\[(.*?)\]/);
-                    if (arrayMatch) {
-                        let arrName = arrayMatch[1];
-                        let index = Number(evalExpr(arrayMatch[2], variables));
-                        if (!Array.isArray(variables[arrName])) variables[arrName] = [];
-                        variables[arrName][index] = val;
-                    } else {
-                        variables[varExpr] = val;
-                    }
-                    logOutput(` > INPUT ${varExpr} = ${val}`);
-                }
-            }
-
-            // ASSIGNMENT (← or <-)
-            else if (line.includes('←') || line.includes('<-')) {
-                let parts = line.split(/←|<-/);
-                let target = parts[0].trim();
-                let expr = parts[1].trim();
-                let val = evalExpr(expr, variables);
-
-                let arrayMatch = target.match(/(\w+)\[(.*?)\]/);
-                if (arrayMatch) {
-                    let arrName = arrayMatch[1];
-                    let index = Number(evalExpr(arrayMatch[2], variables));
-                    if (!Array.isArray(variables[arrName])) variables[arrName] = [];
-                    variables[arrName][index] = val;
-                } else {
-                    variables[target] = val;
-                }
-            }
-
-            // OUTPUT
-            else if (line.startsWith('OUTPUT')) {
-                let content = line.replace('OUTPUT', '').trim();
-                let elements = content.split(',').map(e => {
-                    let clean = e.trim();
-                    if (clean.startsWith('"') && clean.endsWith('"')) {
-                        return clean.slice(1, -1);
-                    }
-                    return evalExpr(clean, variables);
-                });
-                
-                logOutput(" > " + elements.join(' '));
-            }
-
-            pc++;
-        }
-
-        updateInspector(variables);
-    } catch (err) {
-        logOutput("Execution Error: " + err.message);
-    }
-}
-
-// Safely evaluate expressions containing AND, OR, TRUE, FALSE, functions, and arrays
-function evalExpr(expr, variables) {
-    let substituted = expr;
-
-    // Handle string utility functions
-    substituted = substituted.replace(/LENGTH\((.*?)\)/gi, (m, arg) => {
-        let val = evalExpr(arg, variables);
-        return String(val).length;
-    });
-    substituted = substituted.replace(/UCASE\((.*?)\)/gi, (m, arg) => {
-        let val = evalExpr(arg, variables);
-        return `"${String(val).toUpperCase()}"`;
-    });
-    substituted = substituted.replace(/LCASE\((.*?)\)/gi, (m, arg) => {
-        let val = evalExpr(arg, variables);
-        return `"${String(val).toLowerCase()}"`;
-    });
-
-    // Handle array accesses like arr[i]
-    substituted = substituted.replace(/(\w+)\[(.*?)\]/g, (match, arrName, idxExpr) => {
-        let idx = Number(evalExpr(idxExpr, variables));
-        if (Array.isArray(variables[arrName]) && variables[arrName][idx] !== undefined) {
-            let item = variables[arrName][idx];
-            return typeof item === 'string' ? `"${item}"` : item;
-        }
-        return 'undefined';
-    });
-
-    // Replace Cambridge operators with JS operators
-    substituted = substituted
-        .replace(/\bAND\b/gi, '&&')
-        .replace(/\bOR\b/gi, '||')
-        .replace(/\bNOT\b/gi, '!')
-        .replace(/\bTRUE\b/gi, 'true')
-        .replace(/\bFALSE\b/gi, 'false')
-        .replace(/=/g, '===')
-        .replace(/====/g, '===')
-        .replace(/!===/g, '!==')
-        .replace(/<===/g, '<=')
-        .replace(/>===/g, '>=');
-
-    // Sort variable names by length descending
-    let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
-
-    sortedVars.forEach(v => {
-        if (variables[v] !== 'UNINITIALIZED' && !Array.isArray(variables[v])) {
-            let reg = new RegExp(`\\b${v}\\b`, 'g');
-            let val = variables[v];
-            
-            if (typeof val === 'string' && val !== 'true' && val !== 'false') {
-                val = `"${val}"`;
-            }
-            substituted = substituted.replace(reg, val);
-        }
-    });
-
-    try {
-        return Function('"use strict"; return (' + substituted + ')')();
-    } catch (e) {
-        return expr;
-    }
-}
-
-// Auto replace <- and Tab handlers
-const editor = document.getElementById('codeEditor');
-
-editor.addEventListener('input', function(e) {
-    const start = this.selectionStart;
-    const value = this.value;
-
-    if (value.includes('<-')) {
-        this.value = value.replace(/<-/g, '←');
-        this.selectionStart = this.selectionEnd = start - 1;
-    }
-});
-
-editor.addEventListener('keydown', function(e) {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = this.selectionStart;
-        const end = this.selectionEnd;
-
-        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
-        this.selectionStart = this.selectionEnd = start + 4;
-    }
-});
-
-function syncCodeSubmission() {
-    document.getElementById('hiddenCodeInput').value = document.getElementById('codeEditor').value;
-}
-
-window.onload = loadTemplate;
-</script>
-</body>
-</html>
+            <p><code>LENGTH(str
