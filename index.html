@@ -544,22 +544,31 @@ function runSimulation() {
 
 // Safely evaluate expressions containing AND, OR, TRUE, FALSE, and stored variables
 function evalExpr(expr, variables) {
-    let substituted = expr
-        .replace(/\bAND\b/g, '&&')
-        .replace(/\bOR\b/g, '||')
-        .replace(/\bTRUE\b/g, 'true')
-        .replace(/\bFALSE\b/g, 'false')
+    let substituted = expr;
+
+    // Replace Cambridge operators with JS operators
+    substituted = substituted
+        .replace(/\bAND\b/gi, '&&')
+        .replace(/\bOR\b/gi, '||')
+        .replace(/\bNOT\b/gi, '!')
+        .replace(/\bTRUE\b/gi, 'true')
+        .replace(/\bFALSE\b/gi, 'false')
         .replace(/=/g, '===')
         .replace(/====/g, '===')
-        .replace(/!===/g, '!==');
+        .replace(/!===/g, '!==')
+        .replace(/<===/g, '<=')
+        .replace(/>===/g, '>=');
 
+    // Sort variable names by length descending so long names are replaced before short substrings
     let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
 
     sortedVars.forEach(v => {
         if (variables[v] !== 'UNINITIALIZED') {
             let reg = new RegExp(`\\b${v}\\b`, 'g');
             let val = variables[v];
-            if (typeof val === 'string') {
+            
+            // Wrap non-number/non-boolean values in quotes
+            if (typeof val === 'string' && val !== 'true' && val !== 'false') {
                 val = `"${val}"`;
             }
             substituted = substituted.replace(reg, val);
@@ -569,10 +578,9 @@ function evalExpr(expr, variables) {
     try {
         return Function('"use strict"; return (' + substituted + ')')();
     } catch (e) {
-        return expr.replace(/"/g, '');
+        return false;
     }
 }
-
 // Auto replace <- and Tab handlers
 const editor = document.getElementById('codeEditor');
 
