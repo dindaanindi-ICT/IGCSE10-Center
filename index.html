@@ -282,7 +282,7 @@
 <script>
 // Code Templates for Live Demos
 const templates = {
-    selection: `DECLARE score : INTEGER\nscore ← 85\n\nIF score >= 80 THEN\n    OUTPUT "Grade: Distinction"\nELSE\n    OUTPUT "Grade: Pass"\nENDIF`,
+    selection: `DECLARE score : INTEGER\n\nOUTPUT "enter number: "\nINPUT score\n\nIF score >= 80 THEN\n    OUTPUT "Grade: Distinction"\nELSE\n    OUTPUT "Grade: Pass"\nENDIF`,
     loops: `DECLARE total : INTEGER\nDECLARE i : INTEGER\ntotal ← 0\n\nFOR i ← 1 TO 5\n    total ← total + i\n    OUTPUT "Sum at step ", i, " is: ", total\nNEXT i`,
     arrays: `DECLARE names : ARRAY[1:3] OF STRING\nnames[1] ← "Alice"\nnames[2] ← "Bob"\nnames[3] ← "Charlie"\n\nFOR i ← 1 TO 3\n    OUTPUT "Student ", i, " is ", names[i]\nNEXT i`,
     strings: `DECLARE msg : STRING\nmsg ← "Cambridge Pseudocode"\n\nOUTPUT "Original: ", msg\nOUTPUT "Length: ", LENGTH(msg)\nOUTPUT "Upper Case: ", UCASE(msg)`,
@@ -300,38 +300,140 @@ function logOutput(msg) {
     entry.className = 'log-entry';
     entry.textContent = msg;
     logsDiv.appendChild(entry);
+    logsDiv.parentElement.scrollTop = logsDiv.parentElement.scrollHeight;
 }
 
 function clearConsole() {
     document.getElementById('logs').innerHTML = '';
 }
 
-// Pseudocode Execution Simulator
+function updateInspector(variables) {
+    const tableBody = document.getElementById('variableTable');
+    tableBody.innerHTML = '';
+    for (let [key, value] of Object.entries(variables)) {
+        let displayVal = typeof value === 'object' ? JSON.stringify(value) : value;
+        tableBody.innerHTML += `<tr><td>${key}</td><td>${displayVal}</td></tr>`;
+    }
+}
+
+// Full Interpreter with IF/ELSE Block Branching
 function runSimulation() {
     clearConsole();
     const rawCode = document.getElementById('codeEditor').value;
     const lines = rawCode.split('\n');
     let variables = {};
-    const tableBody = document.getElementById('variableTable');
-    tableBody.innerHTML = '';
+    
+    // Control stack to manage execution in active vs inactive IF/ELSE branches
+    let executingStack = [true];
 
     try {
-        lines.forEach((line) => {
-            let trimmed = line.trim();
-            if (trimmed.startsWith('//') || trimmed === '') return;
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith('//') || line === '') continue;
 
-            if (trimmed.startsWith('DECLARE')) {
-                let parts = trimmed.replace('DECLARE', '').split(':');
-                let varName = parts[0].trim();
-                variables[varName] = 'UNINITIALIZED';
+            // 1. IF Evaluation
+            if (line.startsWith('IF')) {
+                let parentActive = executingStack[executingStack.length - 1];
+                if (!parentActive) {
+                    executingStack.push(false);
+                    continue;
+                }
+
+                let condition = line.replace(/^IF/, '').replace(/THEN$/, '').trim();
+                
+                // Inject current variable values into condition string
+                Object.keys(variables).forEach(v => {
+                    if (variables[v] !== 'UNINITIALIZED') {
+                        let reg = new RegExp(`\\b${v}\\b`, 'g');
+                        let val = typeof variables[v] === 'string' ? `"${variables[v]}"` : variables[v];
+                        condition = condition.replace(reg, val);
+                    }
+                });
+
+                let result = false;
+                try {
+                    result = Boolean(Function('"use strict"; return (' + condition + ')')());
+                } catch(e) {
+                    result = false;
+                }
+
+                executingStack.push(result);
+                continue;
             }
-            else if (trimmed.includes('←') || trimmed.includes('<-')) {
-                let parts = trimmed.split(/←|<-/);
+
+            // 2. ELSE Switch
+            if (line === 'ELSE') {
+                if (executingStack.length > 1) {
+                    let parentActive = executingStack[executingStack.length - 2];
+                    let previousBranchResult = executingStack.pop();
+                    executingStack.push(parentActive && !previousBranchResult);
+                }
+                continue;
+            }
+
+            // 3. ENDIF Close
+            if (line === 'ENDIF') {
+                if (executingStack.length > 1) {
+                    executingStack.pop();
+                }
+                continue;
+            }
+
+            // Skip line execution if currently in an inactive branch (e.g. ELSE block when IF is true)
+            if (!executingStack[executingStack.length - 1]) continue;
+
+            // --- EXECUTABLE STATEMENTS ---
+
+            // DECLARE
+            if (line.startsWith('DECLARE')) {
+                let content = line.replace('DECLARE', '').trim();
+                let parts = content.split(':');
+                let varNames = parts[0].split(',').map(v => v.trim());
+                
+                varNames.forEach(varName => {
+                    variables[varName] = 'UNINITIALIZED';
+                });
+            }
+            
+            // INPUT
+            else if (line.startsWith('INPUT')) {
+                let varName = line.replace('INPUT', '').trim();
+                let userInput = prompt(`[INPUT REQUIRED]\nEnter value for variable '${varName}':`);
+                
+                if (userInput !== null) {
+                    if (!isNaN(userInput) && userInput.trim() !== '') {
+                        variables[varName] = Number(userInput);
+                    } else {
+                        variables[varName] = userInput;
+                    }
+                    logOutput(` > INPUT ${varName} = ${variables[varName]}`);
+                } else {
+                    variables[varName] = 'CANCELLED';
+                }
+            }
+
+            // ASSIGNMENT (← or <-)
+            else if (line.includes('←') || line.includes('<-')) {
+                let parts = line.split(/←|<-/);
                 let varName = parts[0].trim();
                 let expr = parts[1].trim();
 
-                expr = expr.replace(/LENGTH\((.*?)\)/g, (m, p1) => (variables[p1] || p1).replace(/"/g, '').length);
-                expr = expr.replace(/UCASE\((.*?)\)/g, (m, p1) => (variables[p1] || p1).replace(/"/g, '').toUpperCase());
+                expr = expr.replace(/LENGTH\((.*?)\)/g, (m, p1) => {
+                    let val = variables[p1.trim()] !== undefined ? variables[p1.trim()] : p1.trim();
+                    return String(val).replace(/"/g, '').length;
+                });
+                expr = expr.replace(/UCASE\((.*?)\)/g, (m, p1) => {
+                    let val = variables[p1.trim()] !== undefined ? variables[p1.trim()] : p1.trim();
+                    return `"${String(val).replace(/"/g, '').toUpperCase()}"`;
+                });
+
+                Object.keys(variables).forEach(v => {
+                    if (variables[v] !== 'UNINITIALIZED') {
+                        let reg = new RegExp(`\\b${v}\\b`, 'g');
+                        let val = typeof variables[v] === 'string' ? `"${variables[v]}"` : variables[v];
+                        expr = expr.replace(reg, val);
+                    }
+                });
 
                 try {
                     let val = Function('"use strict"; return (' + expr + ')')();
@@ -340,26 +442,28 @@ function runSimulation() {
                     variables[varName] = expr.replace(/"/g, '');
                 }
             }
-            else if (trimmed.startsWith('OUTPUT')) {
-                let content = trimmed.replace('OUTPUT', '').trim();
+
+            // OUTPUT
+            else if (line.startsWith('OUTPUT')) {
+                let content = line.replace('OUTPUT', '').trim();
                 let elements = content.split(',').map(e => {
                     let clean = e.trim();
-                    if (clean.startsWith('"') && clean.endsWith('"')) return clean.slice(1, -1);
+                    if (clean.startsWith('"') && clean.endsWith('"')) {
+                        return clean.slice(1, -1);
+                    }
                     return variables[clean] !== undefined ? variables[clean] : clean;
                 });
+                
                 logOutput(" > " + elements.join(' '));
             }
-        });
-
-        for (let [key, value] of Object.entries(variables)) {
-            tableBody.innerHTML += `<tr><td>${key}</td><td>${value}</td></tr>`;
         }
+
+        updateInspector(variables);
     } catch (err) {
         logOutput("Execution Error: " + err.message);
     }
 }
 
-// Copy editor text into the hidden form field prior to submission
 function syncCodeSubmission() {
     document.getElementById('hiddenCodeInput').value = document.getElementById('codeEditor').value;
 }
