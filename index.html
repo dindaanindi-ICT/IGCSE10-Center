@@ -287,7 +287,35 @@ const templates = {
     strings: `DECLARE msg : STRING\nmsg ← "Cambridge Pseudocode"\n\nOUTPUT "Original: ", msg\nOUTPUT "Length: ", LENGTH(msg)\nOUTPUT "Upper Case: ", UCASE(msg)`,
     files: `// File Operations Concept\nOPENFILE "results.txt" FOR WRITE\nWRITEFILE "results.txt", "Pass"\nCLOSEFILE "results.txt"\n\nOUTPUT "File saved successfully."`
 };
+const editor = document.getElementById('codeEditor');
 
+// 1. Auto-replace <- with ← on Space or Enter
+editor.addEventListener('input', function(e) {
+    const start = this.selectionStart;
+    const value = this.value;
+
+    if (value.includes('<-')) {
+        this.value = value.replace(/<-/g, '←');
+        // Maintain correct cursor position after character replacement
+        this.selectionStart = this.selectionEnd = start - 1;
+    }
+});
+
+// 2. Handle Tab key to insert indentation instead of switching focus
+editor.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault(); // Prevent default focus shift
+        
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+
+        // Insert 4 spaces for Cambridge pseudocode indentation
+        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+
+        // Move cursor 4 positions forward
+        this.selectionStart = this.selectionEnd = start + 4;
+    }
+});
 function loadTemplate() {
     const key = document.getElementById('templateSelect').value;
     document.getElementById('codeEditor').value = templates[key];
