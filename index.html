@@ -162,7 +162,7 @@
             color: #000;
             background-color:#8cffe8 ;
         }
-        .challenge-card h2 { margin-top: 0; color: #000;; font-size: 1.1rem; }
+        .challenge-card h2 { margin-top: 0; color: #000; font-size: 1.1rem; }
         .form-group { display: flex; gap: 10px; margin-top: 10px; }
         .form-group input { flex: 1; }
     </style>
@@ -182,7 +182,7 @@
         <div class="doc-section">
             <h3>Selection</h3>
             <p><code>IF (condition) THEN ... ELSE ... ENDIF</code></p>
-            <small style = color:#b90000>Supports comparison logic.</small>
+            <small style="color:#b90000">Supports comparison logic.</small>
         </div>
 
         <div class="doc-section">
@@ -200,7 +200,7 @@
             <p><code>FOR (identifier) ← (start point) TO (end point)</code></p>
             <p><code>(process)</code></p>
             <p><code>NEXT (identifier)</code></p>
-            <small style = color:#b90000>Cambridge demands for using for loop. </small>
+            <small style="color:#b90000">Cambridge demands for using for loop. </small>
         </div>
 
         <div class="doc-section">
@@ -256,9 +256,9 @@
 
         <!-- 3. WEEKLY CHALLENGE & EMAIL SUBMISSION -->
         <div class="challenge-card">
-            <h2 style=color:#000000;>🏆 Weekly Challenge: Grade 10 Array Search</h2>
+            <h2>🏆 Weekly Challenge: Grade 10 Array Search</h2>
             <p class="challengeDescription">
-                <strong style=color:#000;>Task:</strong> Write pseudocode to declare an array of 5 numbers: <code>[12, 45, 68, 23, 89]</code>. 
+                <strong>Task:</strong> Write pseudocode to declare an array of 5 numbers: <code>[12, 45, 68, 23, 89]</code>. 
                 Use a <code>FOR</code> loop to scan through the array and output any number that is greater than 30.
             </p>
             
@@ -278,6 +278,7 @@
 
     </div>
 </div>
+
 <script>
 // Code Templates for Live Demos
 const templates = {
@@ -287,35 +288,7 @@ const templates = {
     strings: `DECLARE msg : STRING\nmsg ← "Cambridge Pseudocode"\n\nOUTPUT "Original: ", msg\nOUTPUT "Length: ", LENGTH(msg)\nOUTPUT "Upper Case: ", UCASE(msg)`,
     files: `// File Operations Concept\nOPENFILE "results.txt" FOR WRITE\nWRITEFILE "results.txt", "Pass"\nCLOSEFILE "results.txt"\n\nOUTPUT "File saved successfully."`
 };
-const editor = document.getElementById('codeEditor');
 
-// 1. Auto-replace <- with ← on Space or Enter
-editor.addEventListener('input', function(e) {
-    const start = this.selectionStart;
-    const value = this.value;
-
-    if (value.includes('<-')) {
-        this.value = value.replace(/<-/g, '←');
-        // Maintain correct cursor position after character replacement
-        this.selectionStart = this.selectionEnd = start - 1;
-    }
-});
-
-// 2. Handle Tab key to insert indentation instead of switching focus
-editor.addEventListener('keydown', function(e) {
-    if (e.key === 'Tab') {
-        e.preventDefault(); // Prevent default focus shift
-        
-        const start = this.selectionStart;
-        const end = this.selectionEnd;
-
-        // Insert 4 spaces for Cambridge pseudocode indentation
-        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
-
-        // Move cursor 4 positions forward
-        this.selectionStart = this.selectionEnd = start + 4;
-    }
-});
 function loadTemplate() {
     const key = document.getElementById('templateSelect').value;
     document.getElementById('codeEditor').value = templates[key];
@@ -343,20 +316,19 @@ function updateInspector(variables) {
     }
 }
 
-// Full Interpreter with Loop Pointer & IF Branching Support
+// Complete Cambridge Interpreter (FOR, WHILE, REPEAT, IF/ELSE, INPUT/OUTPUT)
 function runSimulation() {
     clearConsole();
     const rawCode = document.getElementById('codeEditor').value;
     const lines = rawCode.split('\n');
     let variables = {};
     
-    // Stack management for IF/ELSE and FOR loops
     let executingStack = [true];
-    let loopStack = []; 
+    let loopStack = []; // Stack for nested FOR, WHILE, and REPEAT loops
 
     try {
-        let pc = 0; // Program Counter (Line Pointer)
-        let maxIterations = 1000; // Guard against infinite loops
+        let pc = 0;
+        let maxIterations = 2000;
         let count = 0;
 
         while (pc < lines.length && count < maxIterations) {
@@ -368,7 +340,70 @@ function runSimulation() {
                 continue;
             }
 
-            // 1. FOR LOOP START
+            // 1. REPEAT LOOP START
+            if (line.startsWith('REPEAT')) {
+                loopStack.push({ type: 'REPEAT', lineIndex: pc });
+                pc++;
+                continue;
+            }
+
+            // 2. UNTIL CONDITION
+            if (line.startsWith('UNTIL')) {
+                let condStr = line.replace(/^UNTIL/, '').trim();
+                let condEvaluated = evalExpr(condStr, variables);
+                let isTrue = Boolean(condEvaluated);
+
+                if (!isTrue && loopStack.length > 0) {
+                    let topLoop = loopStack[loopStack.length - 1];
+                    if (topLoop.type === 'REPEAT') {
+                        pc = topLoop.lineIndex + 1; // Loop back
+                        continue;
+                    }
+                } else if (isTrue && loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'REPEAT') {
+                    loopStack.pop(); // Loop condition met, exit
+                }
+                pc++;
+                continue;
+            }
+
+            // 3. WHILE LOOP START
+            if (line.startsWith('WHILE')) {
+                let condStr = line.replace(/^WHILE/, '').replace(/DO$/, '').trim();
+                let condEvaluated = evalExpr(condStr, variables);
+                let isTrue = Boolean(condEvaluated);
+
+                if (isTrue) {
+                    loopStack.push({ type: 'WHILE', lineIndex: pc, condStr: condStr });
+                } else {
+                    let depth = 1;
+                    while (pc < lines.length && depth > 0) {
+                        pc++;
+                        let subLine = lines[pc] ? lines[pc].trim() : '';
+                        if (subLine.startsWith('WHILE')) depth++;
+                        if (subLine === 'ENDWHILE') depth--;
+                    }
+                }
+                pc++;
+                continue;
+            }
+
+            // 4. ENDWHILE
+            if (line === 'ENDWHILE') {
+                if (loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'WHILE') {
+                    let topLoop = loopStack[loopStack.length - 1];
+                    let condEvaluated = evalExpr(topLoop.condStr, variables);
+                    if (Boolean(condEvaluated)) {
+                        pc = topLoop.lineIndex + 1; // Jump back to WHILE body
+                        continue;
+                    } else {
+                        loopStack.pop();
+                    }
+                }
+                pc++;
+                continue;
+            }
+
+            // 5. FOR LOOP START
             if (line.startsWith('FOR')) {
                 let match = line.match(/FOR\s+(\w+)\s*←\s*(.*?)\s+TO\s+(.*)/i);
                 if (match) {
@@ -376,34 +411,33 @@ function runSimulation() {
                     let startVal = Number(evalExpr(match[2], variables));
                     let endVal = Number(evalExpr(match[3], variables));
 
-                    // Initialize iterator on first hit
                     if (loopStack.length === 0 || loopStack[loopStack.length - 1].varName !== varName) {
                         variables[varName] = startVal;
-                        loopStack.push({ varName, endVal, lineIndex: pc });
+                        loopStack.push({ type: 'FOR', varName, endVal, lineIndex: pc });
                     }
                 }
                 pc++;
                 continue;
             }
 
-            // 2. NEXT / LOOP END
+            // 6. NEXT / FOR LOOP END
             if (line.startsWith('NEXT')) {
-                if (loopStack.length > 0) {
+                if (loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'FOR') {
                     let topLoop = loopStack[loopStack.length - 1];
                     variables[topLoop.varName] += 1;
 
                     if (variables[topLoop.varName] <= topLoop.endVal) {
-                        pc = topLoop.lineIndex + 1; // Jump back to body of FOR loop
+                        pc = topLoop.lineIndex + 1;
                         continue;
                     } else {
-                        loopStack.pop(); // Loop finished
+                        loopStack.pop();
                     }
                 }
                 pc++;
                 continue;
             }
 
-            // 3. IF EVALUATION
+            // 7. IF EVALUATION
             if (line.startsWith('IF')) {
                 let parentActive = executingStack[executingStack.length - 1];
                 if (!parentActive) {
@@ -413,14 +447,7 @@ function runSimulation() {
                 }
 
                 let condition = line.replace(/^IF/, '').replace(/THEN$/, '').trim();
-                let condEvaluated = evalExpr(condition, variables);
-
-                let result = false;
-                try {
-                    result = Boolean(Function('"use strict"; return (' + condEvaluated + ')')());
-                } catch(e) {
-                    result = false;
-                }
+                let result = Boolean(evalExpr(condition, variables));
 
                 executingStack.push(result);
                 pc++;
@@ -445,13 +472,12 @@ function runSimulation() {
                 continue;
             }
 
-            // Skip execution if inside inactive IF/ELSE branch
             if (!executingStack[executingStack.length - 1]) {
                 pc++;
                 continue;
             }
 
-            // --- STANDARD STATEMENTS ---
+            // --- EXECUTABLE STATEMENTS ---
 
             // DECLARE
             if (line.startsWith('DECLARE')) {
@@ -472,6 +498,10 @@ function runSimulation() {
                 if (userInput !== null) {
                     if (!isNaN(userInput) && userInput.trim() !== '') {
                         variables[varName] = Number(userInput);
+                    } else if (userInput.toUpperCase() === 'TRUE') {
+                        variables[varName] = true;
+                    } else if (userInput.toUpperCase() === 'FALSE') {
+                        variables[varName] = false;
                     } else {
                         variables[varName] = userInput;
                     }
@@ -512,17 +542,26 @@ function runSimulation() {
     }
 }
 
-// Helper to safely evaluate mathematical and logical expressions with stored variables
+// Safely evaluate expressions containing AND, OR, TRUE, FALSE, and stored variables
 function evalExpr(expr, variables) {
-    let substituted = expr;
-    
-    // Sort variable names by length descending to replace long names before substring names
+    let substituted = expr
+        .replace(/\bAND\b/g, '&&')
+        .replace(/\bOR\b/g, '||')
+        .replace(/\bTRUE\b/g, 'true')
+        .replace(/\bFALSE\b/g, 'false')
+        .replace(/=/g, '===')
+        .replace(/====/g, '===')
+        .replace(/!===/g, '!==');
+
     let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
 
     sortedVars.forEach(v => {
         if (variables[v] !== 'UNINITIALIZED') {
             let reg = new RegExp(`\\b${v}\\b`, 'g');
-            let val = typeof variables[v] === 'string' ? `"${variables[v]}"` : variables[v];
+            let val = variables[v];
+            if (typeof val === 'string') {
+                val = `"${val}"`;
+            }
             substituted = substituted.replace(reg, val);
         }
     });
@@ -533,6 +572,30 @@ function evalExpr(expr, variables) {
         return expr.replace(/"/g, '');
     }
 }
+
+// Auto replace <- and Tab handlers
+const editor = document.getElementById('codeEditor');
+
+editor.addEventListener('input', function(e) {
+    const start = this.selectionStart;
+    const value = this.value;
+
+    if (value.includes('<-')) {
+        this.value = value.replace(/<-/g, '←');
+        this.selectionStart = this.selectionEnd = start - 1;
+    }
+});
+
+editor.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+
+        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+    }
+});
 
 function syncCodeSubmission() {
     document.getElementById('hiddenCodeInput').value = document.getElementById('codeEditor').value;
