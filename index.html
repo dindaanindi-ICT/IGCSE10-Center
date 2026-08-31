@@ -344,7 +344,8 @@ function updateInspector(variables) {
         let displayVal;
         
         if (Array.isArray(value)) {
-            displayVal = JSON.stringify(value);
+            // Clean display format for arrays (strip empty elements if any)
+            displayVal = JSON.stringify(value, (k, v) => v === undefined ? null : v);
         } else if (typeof value === 'object' && value !== null) {
             displayVal = JSON.stringify(value);
         } else {
@@ -392,9 +393,13 @@ function setArrayValue(variables, targetExpr, val, currentLineNum) {
         if (!Array.isArray(variables[arrName])) variables[arrName] = [];
         
         if (indices.length === 1) {
-            variables[arrName][indices[0]] = val;
+            // Convert 1-based index to 0-based JS index
+            let idx = indices[0] - 1;
+            variables[arrName][idx] = val;
         } else if (indices.length === 2) {
-            let [r, c] = indices;
+            // Convert 1-based [row, col] to 0-based JS 2D matrix
+            let r = indices[0] - 1;
+            let c = indices[1] - 1;
             if (!Array.isArray(variables[arrName][r])) {
                 variables[arrName][r] = [];
             }
@@ -696,7 +701,6 @@ function evalExpr(expr, variables, currentLineNum) {
     while (i < str.length) {
         let ch = str[i];
 
-        // Pass through operators, quotes, space, numbers
         if (ch === '"' || ch === "'") {
             let quote = ch;
             let strVal = ch;
@@ -710,7 +714,6 @@ function evalExpr(expr, variables, currentLineNum) {
             continue;
         }
 
-        // Match Identifier Name
         if (/[a-zA-Z_]/.test(ch)) {
             let id = '';
             while (i < str.length && /[a-zA-Z0-9_]/.test(str[i])) {
@@ -718,7 +721,6 @@ function evalExpr(expr, variables, currentLineNum) {
                 i++;
             }
 
-            // Check if array indexing follows: id[...]
             let sub = str.slice(i).trimStart();
             if (sub.startsWith('[')) {
                 let bracketCount = 0;
@@ -736,16 +738,17 @@ function evalExpr(expr, variables, currentLineNum) {
                 bracketContent = str.slice(startBracket + 1, j);
                 i = j + 1;
 
-                // Evaluate indexes recursively
                 let indexVals = bracketContent.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
 
                 if (variables[id] !== undefined) {
                     let targetArr = variables[id];
                     let val;
                     if (indexVals.length === 1) {
-                        val = targetArr[indexVals[0]];
+                        let idx = indexVals[0] - 1; // 1-based to 0-based conversion
+                        val = targetArr[idx];
                     } else if (indexVals.length === 2) {
-                        let [r, c] = indexVals;
+                        let r = indexVals[0] - 1; // 1-based row conversion
+                        let c = indexVals[1] - 1; // 1-based col conversion
                         val = (Array.isArray(targetArr[r])) ? targetArr[r][c] : undefined;
                     }
                     tokens.push(typeof val === 'string' ? `"${val}"` : (val !== undefined ? val : 'undefined'));
@@ -755,7 +758,6 @@ function evalExpr(expr, variables, currentLineNum) {
                 continue;
             }
 
-            // Standard Identifier Variable
             let upperID = id.toUpperCase();
             if (['AND', 'OR', 'NOT', 'TRUE', 'FALSE'].includes(upperID)) {
                 tokens.push(id);
