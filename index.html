@@ -45,7 +45,6 @@
             overflow: hidden;
         }
 
-        /* Syntax Reference Sidebar */
         .docs-panel {
             width: 300px;
             background-color: var(--panel-bg);
@@ -65,7 +64,6 @@
         .doc-section h3 { margin-top: 0; color: var(--success); font-size: 0.95rem; }
         .doc-section code { background: #222235; padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; color: #fd79a8; }
 
-        /* Main Workspace */
         .workspace {
             flex: 1;
             display: flex;
@@ -104,7 +102,6 @@
             min-height: 350px;
         }
 
-        /* Line Numbers + Textarea Wrapper */
         .editor-wrapper {
             flex: 1;
             display: flex;
@@ -172,7 +169,6 @@
         th, td { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); font-size: 12px; }
         th { color: var(--accent); }
 
-        /* Weekly Challenge Section */
         .challenge-card {
             background-color: var(--panel-bg);
             border: 1px solid var(--accent);
@@ -247,7 +243,6 @@
     </div>
 
     <div class="workspace">
-        
         <div class="toolbar">
             <label for="templateSelect">Explore Concept Demo:</label>
             <select id="templateSelect" onchange="loadTemplate()">
@@ -302,12 +297,10 @@
                 </div>
             </form>
         </div>
-
     </div>
 </div>
 
 <script>
-// Code Templates for Live Demos
 const templates = {
     selection: `DECLARE score : INTEGER\n\nOUTPUT "enter number: "\nINPUT score\n\nIF score >= 80 THEN\n    OUTPUT "Grade: Distinction"\nELSE\n    OUTPUT "Grade: Pass"\nENDIF`,
     loops: `DECLARE total : INTEGER\nDECLARE i : INTEGER\ntotal ← 0\n\nFOR i ← 1 TO 5\n    total ← total + i\n    OUTPUT "Sum at step ", i, " is: ", total\nNEXT i`,
@@ -374,13 +367,82 @@ function updateInspector(variables) {
     }
 }
 
-// Complete Cambridge Interpreter with Line Number & Reason Error Reporting
+// Quote-Aware Argument Splitter for OUTPUT
+function parseOutputArgs(argString) {
+    let result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < argString.length; i++) {
+        let char = argString[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+            current += char;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    if (current.trim() !== '') {
+        result.push(current.trim());
+    }
+    return result;
+}
+
+function checkAllErrors(lines) {
+    let errors = [];
+
+    lines.forEach((rawLine, idx) => {
+        let lineNum = idx + 1;
+        let line = rawLine.trim();
+
+        if (line === '' || line.startsWith('//')) return;
+
+        if (line.startsWith('IF ')) {
+            if (!line.includes('THEN')) {
+                errors.push(`Line ${lineNum}: Missing 'THEN' in IF statement.`);
+            }
+        }
+        else if (line.startsWith('FOR ')) {
+            if (!line.includes('TO')) {
+                errors.push(`Line ${lineNum}: Invalid FOR loop structure (missing 'TO').`);
+            }
+        }
+        else if (!line.startsWith('DECLARE') && 
+                 !line.startsWith('INPUT') && 
+                 !line.startsWith('OUTPUT') && 
+                 !line.startsWith('ELSE') && 
+                 !line.startsWith('ENDIF') && 
+                 !line.startsWith('NEXT') && 
+                 !line.startsWith('WHILE') && 
+                 !line.startsWith('ENDWHILE') && 
+                 !line.startsWith('REPEAT') && 
+                 !line.startsWith('UNTIL') && 
+                 !line.startsWith('OPENFILE') && 
+                 !line.startsWith('WRITEFILE') && 
+                 !line.startsWith('CLOSEFILE') && 
+                 !line.includes('←') && !line.includes('<-')) {
+            errors.push(`Line ${lineNum}: Unrecognized statement standard '${line}'`);
+        }
+    });
+
+    return errors;
+}
+
 function runSimulation() {
     clearConsole();
     const rawCode = document.getElementById('codeEditor').value;
     const lines = rawCode.split('\n');
+
+    let syntaxErrors = checkAllErrors(lines);
+    if (syntaxErrors.length > 0) {
+        syntaxErrors.forEach(err => logError("❌ Error: " + err));
+        return;
+    }
+
     let variables = {};
-    
     let executingStack = [true];
     let loopStack = []; 
 
@@ -391,7 +453,7 @@ function runSimulation() {
     try {
         while (pc < lines.length && count < maxIterations) {
             count++;
-            let currentLineNum = pc + 1; // Line number is 1-indexed
+            let currentLineNum = pc + 1;
             let line = lines[pc].trim();
 
             if (line.startsWith('//') || line === '') {
@@ -399,14 +461,12 @@ function runSimulation() {
                 continue;
             }
 
-            // 1. REPEAT LOOP START
             if (line.startsWith('REPEAT')) {
                 loopStack.push({ type: 'REPEAT', lineIndex: pc });
                 pc++;
                 continue;
             }
 
-            // 2. UNTIL CONDITION
             if (line.startsWith('UNTIL')) {
                 let condStr = line.replace(/^UNTIL/, '').trim();
                 let condEvaluated = evalExpr(condStr, variables, currentLineNum);
@@ -425,7 +485,6 @@ function runSimulation() {
                 continue;
             }
 
-            // 3. WHILE LOOP START
             if (line.startsWith('WHILE')) {
                 let condStr = line.replace(/^WHILE/, '').replace(/DO$/, '').trim();
                 let condEvaluated = evalExpr(condStr, variables, currentLineNum);
@@ -446,7 +505,6 @@ function runSimulation() {
                 continue;
             }
 
-            // 4. ENDWHILE
             if (line === 'ENDWHILE') {
                 if (loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'WHILE') {
                     let topLoop = loopStack[loopStack.length - 1];
@@ -462,9 +520,8 @@ function runSimulation() {
                 continue;
             }
 
-            // 5. FOR LOOP START
             if (line.startsWith('FOR')) {
-                let match = line.match(/FOR\s+(\w+)\s*←\s*(.*?)\s+TO\s+(.*)/i);
+                let match = line.match(/FOR\s+(\w+)\s*←\s*(.*?)\s+TO\s+(.*)/i) || line.match(/FOR\s+(\w+)\s*=\s*(.*?)\s+TO\s+(.*)/i);
                 if (match) {
                     let varName = match[1];
                     let startVal = Number(evalExpr(match[2], variables, currentLineNum));
@@ -485,7 +542,6 @@ function runSimulation() {
                 continue;
             }
 
-            // 6. NEXT / FOR LOOP END
             if (line.startsWith('NEXT')) {
                 if (loopStack.length > 0 && loopStack[loopStack.length - 1].type === 'FOR') {
                     let topLoop = loopStack[loopStack.length - 1];
@@ -502,7 +558,6 @@ function runSimulation() {
                 continue;
             }
 
-            // 7. IF EVALUATION
             if (line.startsWith('IF')) {
                 let parentActive = executingStack[executingStack.length - 1];
                 if (!parentActive) {
@@ -542,9 +597,6 @@ function runSimulation() {
                 continue;
             }
 
-            // --- EXECUTABLE STATEMENTS ---
-
-            // DECLARE
             if (line.startsWith('DECLARE')) {
                 let content = line.replace('DECLARE', '').trim();
                 let parts = content.split(':');
@@ -563,7 +615,6 @@ function runSimulation() {
                 });
             }
             
-            // INPUT
             else if (line.startsWith('INPUT')) {
                 let varExpr = line.replace('INPUT', '').trim();
                 let userInput = prompt(`[INPUT REQUIRED]\nEnter value for '${varExpr}':`);
@@ -588,7 +639,6 @@ function runSimulation() {
                 }
             }
 
-            // ASSIGNMENT (← or <-)
             else if (line.includes('←') || line.includes('<-')) {
                 let parts = line.split(/←|<-/);
                 let target = parts[0].trim();
@@ -606,10 +656,10 @@ function runSimulation() {
                 }
             }
 
-            // OUTPUT
             else if (line.startsWith('OUTPUT')) {
                 let content = line.replace('OUTPUT', '').trim();
-                let elements = content.split(',').map(e => {
+                let rawArgs = parseOutputArgs(content);
+                let elements = rawArgs.map(e => {
                     let clean = e.trim();
                     if (clean.startsWith('"') && clean.endsWith('"')) {
                         return clean.slice(1, -1);
@@ -618,8 +668,6 @@ function runSimulation() {
                 });
                 
                 logOutput(" > " + elements.join(' '));
-            } else {
-                throw new Error(`Line ${currentLineNum}: Unrecognized statement standard '${line}'`);
             }
 
             pc++;
@@ -636,11 +684,9 @@ function runSimulation() {
     }
 }
 
-// Safely evaluate expressions containing AND, OR, TRUE, FALSE, functions, and arrays
 function evalExpr(expr, variables, currentLineNum) {
     let substituted = expr;
 
-    // Handle string utility functions
     substituted = substituted.replace(/LENGTH\((.*?)\)/gi, (m, arg) => {
         let val = evalExpr(arg, variables, currentLineNum);
         return String(val).length;
@@ -654,7 +700,6 @@ function evalExpr(expr, variables, currentLineNum) {
         return `"${String(val).toLowerCase()}"`;
     });
 
-    // Handle array accesses like arr[i]
     substituted = substituted.replace(/(\w+)\[(.*?)\]/g, (match, arrName, idxExpr) => {
         let idx = Number(evalExpr(idxExpr, variables, currentLineNum));
         if (Array.isArray(variables[arrName]) && variables[arrName][idx] !== undefined) {
@@ -664,7 +709,6 @@ function evalExpr(expr, variables, currentLineNum) {
         return 'undefined';
     });
 
-    // Replace Cambridge operators with JS operators
     substituted = substituted
         .replace(/\bAND\b/gi, '&&')
         .replace(/\bOR\b/gi, '||')
@@ -677,7 +721,6 @@ function evalExpr(expr, variables, currentLineNum) {
         .replace(/<===/g, '<=')
         .replace(/>===/g, '>=');
 
-    // Sort variable names by length descending
     let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
 
     sortedVars.forEach(v => {
@@ -699,7 +742,6 @@ function evalExpr(expr, variables, currentLineNum) {
     }
 }
 
-// Auto replace <- and Sync Scroll / Line Numbers
 const editor = document.getElementById('codeEditor');
 const lineNumbers = document.getElementById('lineNumbers');
 
