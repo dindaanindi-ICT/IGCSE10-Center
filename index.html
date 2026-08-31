@@ -378,11 +378,16 @@ function parseOutputArgs(argString) {
     return result;
 }
 
+function getArrayIndexValues(idxExpr, variables, currentLineNum) {
+    let parts = idxExpr.split(',');
+    return parts.map(p => Number(evalExpr(p.trim(), variables, currentLineNum)));
+}
+
 function setArrayValue(variables, targetExpr, val, currentLineNum) {
-    let arrayMatch = targetExpr.match(/(\w+)\[(.*?)\]/);
+    let arrayMatch = targetExpr.match(/^(\w+)\s*\[(.*?)\]$/);
     if (arrayMatch) {
         let arrName = arrayMatch[1];
-        let indices = arrayMatch[2].split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
+        let indices = getArrayIndexValues(arrayMatch[2], variables, currentLineNum);
         
         if (!Array.isArray(variables[arrName])) variables[arrName] = [];
         
@@ -678,43 +683,96 @@ function runSimulation() {
 }
 
 function evalExpr(expr, variables, currentLineNum) {
-    let substituted = expr;
+    let str = expr.trim();
 
-    substituted = substituted.replace(/LENGTH\((.*?)\)/gi, (m, arg) => {
-        let val = evalExpr(arg, variables, currentLineNum);
-        return String(val).length;
-    });
-    substituted = substituted.replace(/UCASE\((.*?)\)/gi, (m, arg) => {
-        let val = evalExpr(arg, variables, currentLineNum);
-        return `"${String(val).toUpperCase()}"`;
-    });
-    substituted = substituted.replace(/LCASE\((.*?)\)/gi, (m, arg) => {
-        let val = evalExpr(arg, variables, currentLineNum);
-        return `"${String(val).toLowerCase()}"`;
-    });
+    // 1. Built-in Functions
+    str = str.replace(/LENGTH\((.*?)\)/gi, (m, arg) => String(evalExpr(arg, variables, currentLineNum)).length);
+    str = str.replace(/UCASE\((.*?)\)/gi, (m, arg) => `"${String(evalExpr(arg, variables, currentLineNum)).toUpperCase()}"`);
+    str = str.replace(/LCASE\((.*?)\)/gi, (m, arg) => `"${String(evalExpr(arg, variables, currentLineNum)).toLowerCase()}"`);
 
-    // 1. Process Array Access FIRST before substituting scalar variable names
-    substituted = substituted.replace(/(\w+)\[(.*?)\]/g, (match, arrName, idxExpr) => {
-        let indices = idxExpr.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
-        
-        if (variables[arrName] !== undefined) {
-            let targetArr = variables[arrName];
-            if (indices.length === 1) {
-                let item = targetArr[indices[0]];
-                if (item !== undefined) return typeof item === 'string' ? `"${item}"` : item;
-            } else if (indices.length === 2) {
-                let [r, c] = indices;
-                if (Array.isArray(targetArr[r]) && targetArr[r][c] !== undefined) {
-                    let item = targetArr[r][c];
-                    return typeof item === 'string' ? `"${item}"` : item;
-                }
+    // 2. Tokenizer to handle variable vs string evaluation cleanly
+    let tokens = [];
+    let i = 0;
+    while (i < str.length) {
+        let ch = str[i];
+
+        // Pass through operators, quotes, space, numbers
+        if (ch === '"' || ch === "'") {
+            let quote = ch;
+            let strVal = ch;
+            i++;
+            while (i < str.length && str[i] !== quote) {
+                strVal += str[i];
+                i++;
             }
+            if (i < str.length) strVal += str[i++];
+            tokens.push(strVal);
+            continue;
         }
-        return 'undefined';
-    });
 
-    // 2. Normalize pseudocode operators
-    substituted = substituted
+        // Match Identifier Name
+        if (/[a-zA-Z_]/.test(ch)) {
+            let id = '';
+            while (i < str.length && /[a-zA-Z0-9_]/.test(str[i])) {
+                id += str[i];
+                i++;
+            }
+
+            // Check if array indexing follows: id[...]
+            let sub = str.slice(i).trimStart();
+            if (sub.startsWith('[')) {
+                let bracketCount = 0;
+                let bracketContent = '';
+                let j = str.indexOf('[', i);
+                let startBracket = j;
+                
+                for (; j < str.length; j++) {
+                    if (str[j] === '[') bracketCount++;
+                    else if (str[j] === ']') bracketCount--;
+                    
+                    if (bracketCount === 0) break;
+                }
+
+                bracketContent = str.slice(startBracket + 1, j);
+                i = j + 1;
+
+                // Evaluate indexes recursively
+                let indexVals = bracketContent.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
+
+                if (variables[id] !== undefined) {
+                    let targetArr = variables[id];
+                    let val;
+                    if (indexVals.length === 1) {
+                        val = targetArr[indexVals[0]];
+                    } else if (indexVals.length === 2) {
+                        let [r, c] = indexVals;
+                        val = (Array.isArray(targetArr[r])) ? targetArr[r][c] : undefined;
+                    }
+                    tokens.push(typeof val === 'string' ? `"${val}"` : (val !== undefined ? val : 'undefined'));
+                } else {
+                    tokens.push('undefined');
+                }
+                continue;
+            }
+
+            // Standard Identifier Variable
+            let upperID = id.toUpperCase();
+            if (['AND', 'OR', 'NOT', 'TRUE', 'FALSE'].includes(upperID)) {
+                tokens.push(id);
+            } else if (variables[id] !== undefined && variables[id] !== 'UNINITIALIZED') {
+                let val = variables[id];
+                tokens.push(typeof val === 'string' ? `"${val}"` : val);
+            } else {
+                tokens.push(id);
+            }
+            continue;
+        }
+
+        tokens.push(ch);
+        i++;
+    }
+
+    let substituted = tokens.join('')
         .replace(/\bAND\b/gi, '&&')
         .replace(/\bOR\b/gi, '||')
         .replace(/\bNOT\b/gi, '!')
@@ -725,21 +783,6 @@ function evalExpr(expr, variables, currentLineNum) {
         .replace(/!===/g, '!==')
         .replace(/<===/g, '<=')
         .replace(/>===/g, '>=');
-
-    // 3. Perform exact-word replacements for standalone scalar variables
-    let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
-
-    sortedVars.forEach(v => {
-        if (variables[v] !== 'UNINITIALIZED' && !Array.isArray(variables[v])) {
-            let val = variables[v];
-            if (typeof val === 'string' && val !== 'true' && val !== 'false') {
-                val = `"${val}"`;
-            }
-            
-            let regex = new RegExp(`\\b${v}\\b`, 'g');
-            substituted = substituted.replace(regex, val);
-        }
-    });
 
     try {
         return Function('"use strict"; return (' + substituted + ')')();
