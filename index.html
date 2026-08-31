@@ -693,7 +693,7 @@ function evalExpr(expr, variables, currentLineNum) {
         return `"${String(val).toLowerCase()}"`;
     });
 
-    // Handle 1D and 2D Array Evaluator (e.g. scores[x, i])
+    // 1. Process Array Access FIRST before substituting scalar variable names
     substituted = substituted.replace(/(\w+)\[(.*?)\]/g, (match, arrName, idxExpr) => {
         let indices = idxExpr.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
         
@@ -713,6 +713,7 @@ function evalExpr(expr, variables, currentLineNum) {
         return 'undefined';
     });
 
+    // 2. Normalize pseudocode operators
     substituted = substituted
         .replace(/\bAND\b/gi, '&&')
         .replace(/\bOR\b/gi, '||')
@@ -725,6 +726,7 @@ function evalExpr(expr, variables, currentLineNum) {
         .replace(/<===/g, '<=')
         .replace(/>===/g, '>=');
 
+    // 3. Perform exact-word replacements for standalone scalar variables
     let sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
 
     sortedVars.forEach(v => {
@@ -734,8 +736,7 @@ function evalExpr(expr, variables, currentLineNum) {
                 val = `"${val}"`;
             }
             
-            // Safely replace standalone variable names while ignoring strings inside quotes
-            let regex = new RegExp(`(?<!["'\\w])\\b${v}\\b(?!["'\\w])`, 'g');
+            let regex = new RegExp(`\\b${v}\\b`, 'g');
             substituted = substituted.replace(regex, val);
         }
     });
