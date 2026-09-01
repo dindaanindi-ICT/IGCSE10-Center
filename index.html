@@ -359,13 +359,20 @@ function parseOutputArgs(argString) {
     let result = [];
     let current = '';
     let inQuotes = false;
+    let bracketCount = 0;
 
     for (let i = 0; i < argString.length; i++) {
         let char = argString[i];
-        if (char === '"') {
+        if (char === '"' || char === "'") {
             inQuotes = !inQuotes;
             current += char;
-        } else if (char === ',' && !inQuotes) {
+        } else if (char === '[' && !inQuotes) {
+            bracketCount++;
+            current += char;
+        } else if (char === ']' && !inQuotes) {
+            bracketCount--;
+            current += char;
+        } else if (char === ',' && !inQuotes && bracketCount === 0) {
             result.push(current.trim());
             current = '';
         } else {
@@ -377,7 +384,7 @@ function parseOutputArgs(argString) {
     }
     return result;
 }
-
+    
 function getArrayIndexValues(idxExpr, variables, currentLineNum) {
     let parts = idxExpr.split(',');
     return parts.map(p => Number(evalExpr(p.trim(), variables, currentLineNum)));
@@ -693,22 +700,20 @@ function runSimulation() {
 function evalExpr(expr, variables, currentLineNum) {
     let str = expr.trim();
 
-    // 1. Built-in Functions
+    // Built-in Functions
     str = str.replace(/LENGTH\((.*?)\)/gi, (m, arg) => String(evalExpr(arg, variables, currentLineNum)).length);
     str = str.replace(/UCASE\((.*?)\)/gi, (m, arg) => `"${String(evalExpr(arg, variables, currentLineNum)).toUpperCase()}"`);
     str = str.replace(/LCASE\((.*?)\)/gi, (m, arg) => `"${String(evalExpr(arg, variables, currentLineNum)).toLowerCase()}"`);
 
-    // 2. Direct 1D and 2D Array Access Resolution
-    // Resolves expressions like scores[h, i] or numbers[i] BEFORE general evaluation
+    // Array Lookup Resolution
     str = str.replace(/(\w+)\s*\[\s*([^\]]+)\s*\]/g, (match, arrName, indexExpr) => {
         if (variables[arrName] !== undefined) {
             let targetArr = variables[arrName];
-            // Recursively evaluate each index argument in context
             let indices = indexExpr.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
             
             let val;
             if (indices.length === 1) {
-                let idx = indices[0] - 1; // 1-based indexing conversion
+                let idx = indices[0] - 1;
                 val = targetArr[idx];
             } else if (indices.length === 2) {
                 let r = indices[0] - 1;
@@ -722,13 +727,12 @@ function evalExpr(expr, variables, currentLineNum) {
         return match;
     });
 
-    // 3. Strict Lexical Tokenizer for Remaining Identifiers
+    // Tokenize remaining identifiers safely
     let tokens = [];
     let i = 0;
     while (i < str.length) {
         let ch = str[i];
 
-        // Handle Strings
         if (ch === '"' || ch === "'") {
             let quote = ch;
             let strVal = ch;
@@ -742,7 +746,6 @@ function evalExpr(expr, variables, currentLineNum) {
             continue;
         }
 
-        // Handle Identifiers & Variables
         if (/[a-zA-Z_]/.test(ch)) {
             let id = '';
             while (i < str.length && /[a-zA-Z0-9_]/.test(str[i])) {
