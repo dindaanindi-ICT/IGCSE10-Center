@@ -644,21 +644,25 @@ function runSimulation() {
                 });
             }
             
-            else if (line.startsWith('INPUT')) {
+           else if (line.startsWith('INPUT')) {
                 let varExpr = line.replace('INPUT', '').trim();
                 let userInput = prompt(`[INPUT REQUIRED]\nEnter value for '${varExpr}':`);
-                
-                if (userInput !== null) {
-                    let val = (!isNaN(userInput) && userInput.trim() !== '') ? Number(userInput) : userInput;
-                    if (typeof userInput === 'string') {
-                        if (userInput.toUpperCase() === 'TRUE') val = true;
-                        if (userInput.toUpperCase() === 'FALSE') val = false;
-                    }
-                    
-                    setArrayValue(variables, varExpr, val, currentLineNum);
-                    logOutput(` > INPUT ${varExpr} = ${val}`);
+    
+   
+                if (userInput === null) {
+                    logError("🛑 Execution cancelled by user.");
+                    return; // Immediately stops the runSimulation execution loop
                 }
-            }
+                
+                let val = (!isNaN(userInput) && userInput.trim() !== '') ? Number(userInput) : userInput;
+                if (typeof userInput === 'string') {
+                    if (userInput.toUpperCase() === 'TRUE') val = true;
+                    if (userInput.toUpperCase() === 'FALSE') val = false;
+                }
+                
+                setArrayValue(variables, varExpr, val, currentLineNum);
+                logOutput(` > INPUT ${varExpr} = ${val}`);
+    }
 
             else if (line.includes('←') || line.includes('<-')) {
                 let parts = line.split(/←|<-/);
