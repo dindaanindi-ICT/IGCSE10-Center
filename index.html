@@ -698,12 +698,37 @@ function evalExpr(expr, variables, currentLineNum) {
     str = str.replace(/UCASE\((.*?)\)/gi, (m, arg) => `"${String(evalExpr(arg, variables, currentLineNum)).toUpperCase()}"`);
     str = str.replace(/LCASE\((.*?)\)/gi, (m, arg) => `"${String(evalExpr(arg, variables, currentLineNum)).toLowerCase()}"`);
 
-    // 2. Strict Lexical Tokenizer
+    // 2. Direct 1D and 2D Array Access Resolution
+    // Resolves expressions like scores[h, i] or numbers[i] BEFORE general evaluation
+    str = str.replace(/(\w+)\s*\[\s*([^\]]+)\s*\]/g, (match, arrName, indexExpr) => {
+        if (variables[arrName] !== undefined) {
+            let targetArr = variables[arrName];
+            // Recursively evaluate each index argument in context
+            let indices = indexExpr.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
+            
+            let val;
+            if (indices.length === 1) {
+                let idx = indices[0] - 1; // 1-based indexing conversion
+                val = targetArr[idx];
+            } else if (indices.length === 2) {
+                let r = indices[0] - 1;
+                let c = indices[1] - 1;
+                val = (Array.isArray(targetArr[r])) ? targetArr[r][c] : undefined;
+            }
+            
+            if (typeof val === 'string') return `"${val}"`;
+            return val !== undefined ? val : '0';
+        }
+        return match;
+    });
+
+    // 3. Strict Lexical Tokenizer for Remaining Identifiers
     let tokens = [];
     let i = 0;
     while (i < str.length) {
         let ch = str[i];
 
+        // Handle Strings
         if (ch === '"' || ch === "'") {
             let quote = ch;
             let strVal = ch;
@@ -717,46 +742,12 @@ function evalExpr(expr, variables, currentLineNum) {
             continue;
         }
 
+        // Handle Identifiers & Variables
         if (/[a-zA-Z_]/.test(ch)) {
             let id = '';
             while (i < str.length && /[a-zA-Z0-9_]/.test(str[i])) {
                 id += str[i];
                 i++;
-            }
-
-            let sub = str.slice(i).trimStart();
-            if (sub.startsWith('[')) {
-                let bracketCount = 0;
-                let j = str.indexOf('[', i);
-                let startBracket = j;
-                
-                for (; j < str.length; j++) {
-                    if (str[j] === '[') bracketCount++;
-                    else if (str[j] === ']') bracketCount--;
-                    if (bracketCount === 0) break;
-                }
-
-                let bracketContent = str.slice(startBracket + 1, j);
-                i = j + 1;
-
-                let indexVals = bracketContent.split(',').map(idx => Number(evalExpr(idx.trim(), variables, currentLineNum)));
-
-                if (variables[id] !== undefined) {
-                    let targetArr = variables[id];
-                    let val;
-                    if (indexVals.length === 1) {
-                        let idx = indexVals[0] - 1;
-                        val = targetArr[idx];
-                    } else if (indexVals.length === 2) {
-                        let r = indexVals[0] - 1;
-                        let c = indexVals[1] - 1;
-                        val = (Array.isArray(targetArr[r])) ? targetArr[r][c] : undefined;
-                    }
-                    tokens.push(typeof val === 'string' ? `"${val}"` : (val !== undefined ? val : 'undefined'));
-                } else {
-                    tokens.push('undefined');
-                }
-                continue;
             }
 
             let upperID = id.toUpperCase();
